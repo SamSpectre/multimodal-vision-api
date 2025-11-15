@@ -2,8 +2,7 @@
 # Environment and secrets
 .env
 .env.*
-.claude/
-CLAUDE.md
+
 
 # Python virtual environments
 venv/
@@ -34,4 +33,4 @@ dist/
 build/
 *.egg-info/
 
-.claude/
+
