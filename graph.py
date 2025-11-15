@@ -158,8 +158,8 @@ if __name__ == "__main__":
 
         print("\n\n[SUCCESS] Multi-Agent System is working perfectly!")
         print("\nKey Differences from Old Patterns:")
-        print("  [OLD] create_react_agent from langgraph.prebuilt → DEPRECATED")
-        print("  [NEW] create_agent from langchain.agents → CURRENT")
+        print("  [OLD] create_react_agent from langgraph.prebuilt - DEPRECATED")
+        print("  [NEW] create_agent from langchain.agents - CURRENT")
         print()
         print("  [OLD] Single vision agent")
         print("  [NEW] Multi-agent with Vision + OCR + QA specialists")
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         print("  [NEW] Automatic via create_agent")
         print()
         print("\nArchitecture Pattern:")
-        print("  User → Supervisor → [Vision|OCR|QA] → Response")
+        print("  User -> Supervisor -> [Vision|OCR|QA] -> Response")
         print()
         print("This follows LangChain 2025 best practices!")
 
