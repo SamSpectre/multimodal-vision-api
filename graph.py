@@ -1,87 +1,117 @@
 """
-LangChain v1.0 Vision Agentic System
-Using the NEW create_agent pattern!
+LangChain v1.0 Multi-Agent Multimodal System
+Using the NEW create_agent pattern with Tool-Calling Supervisor!
 
-This replaces the old manual LangGraph approach with the new
-simplified LangChain v1.0 agent pattern.
+This is the MODERN, RECOMMENDED architecture for multi-agent systems (2025):
+- Supervisor agent orchestrates specialist agents
+- Specialist agents (Vision, OCR, QA) wrapped as tools
+- Tool-calling pattern (official LangChain recommendation)
+- Centralized control flow with intelligent delegation
 
 KEY V1.0 CHANGES:
-- Use create_agent() instead of manual llm.bind_tools()
-- Agents are automatically built on LangGraph
-- Much simpler API!
+- Use create_agent() (NOT deprecated create_react_agent)
+- Multi-agent system with supervisor pattern
+- Tool-calling for delegation (NOT manual routing)
+- Each specialist is a create_agent instance
+- Much simpler than manual StateGraph construction!
+
+Architecture:
+    User → Supervisor → [Vision | OCR | QA] Specialist → Response
 """
 
-from langchain.agents import create_agent
-from src.state.graph_state import State
-from src.tools.basic_vision_tools import basic_vision_tools
+from src.agents.supervisor import create_supervisor
 from config.settings import settings
 
 
-def build_vision_agent():
+def build_multiagent_system():
     """
-    Build a vision agent using the new create_agent pattern- Langchain v1.0
-    New Features:
-    -Langgraph based execution
-    -Built in memory and Tool calling, checkpointing.
-    -Human in the loop for verification.
-    
-    What doesn't need to be done manually:
-    -Create State grpah.
-    -Add nodes to the graph manually.
-    -Define edges
-    -Bind tools to LLMs
+    Build a multi-agent system using the modern LangChain v1.0 pattern.
+
+    Architecture:
+    - **Supervisor Agent**: Analyzes requests and delegates to specialists
+    - **Vision Specialist**: Image analysis, colors, quality assessment
+    - **OCR Specialist**: Text extraction, document processing
+    - **QA Specialist**: Question answering based on context
+
+    This uses the TOOL-CALLING PATTERN (recommended by LangChain 2025):
+    - Each specialist agent is wrapped as a tool
+    - Supervisor intelligently routes to appropriate specialist(s)
+    - Can call multiple specialists for complex tasks
+    - Maintains conversation context across calls
+
     Returns:
-    A compiled graph ready to use.
-      OLD WAY (v0.x):
+        Compiled supervisor agent ready to use
+
+    Example usage:
+        >>> agent = build_multiagent_system()
+        >>> result = agent.invoke({
+        ...     "messages": [{"role": "user", "content": "Analyze image.jpg and extract any text"}]
+        ... })
+        >>> print(result["messages"][-1].content)
+
+    OLD WAY (Deprecated - DON'T USE):
     ```python
-    llm = ChatOpenAI(model="gpt-4o")
-    llm_with_tools = llm.bind_tools(tools)
-    graph = StateGraph(...)
-    graph.add_node("agent", llm_with_tools)
-    # ... more manual setup
-    app = graph.compile()
+    from langgraph.prebuilt import create_react_agent  # DEPRECATED!
+    agent = create_react_agent(llm, tools, ...)
     ```
-    
-    NEW WAY (v1.0):
+
+    NEW WAY (Modern v1.0 - USE THIS):
     ```python
-    agent = create_agent(
+    from langchain.agents import create_agent  # CURRENT API
+    supervisor = create_agent(
         model="gpt-4o",
-        tools=[...],
-        system_prompt="..."
+        tools=[vision_specialist, ocr_specialist, qa_specialist],
+        system_prompt="Route to specialists..."
     )
     ```
-    """
-    system_prompt = """
-    You are a helpful assistant that can analyze images and provide information about them.
-    You can use the following tools to analyze the image:
-    - get_image_properties: Get basic properties of an image file.
-    - analyze_image_colors: Analyze the colors in an image.
-    - detect_image_quality_issues: Detect potential quality issues in an image.
 
-    **Guidelines:**
-    -1. When user asks "analyze this image" → Use ALL tools
-    -2. When user asks specific questions → Use relevant tool(s)
-    -3. When user asks about colors → Use analyze_image_colors
-    -4. When user asks about quality → Use detect_image_quality_issues
-    -5. Always be thorough but concise
-
-    **Important:**
-    - Always use at least ONE tool when analyzing images
-    - Don't just describe the image - use tools to get data!
-    - Always be thorough but concise
-
+    Multi-Agent Benefits:
+    - **Specialization**: Each agent focuses on specific domain
+    - **Scalability**: Easy to add new specialists
+    - **Maintainability**: Clear separation of concerns
+    - **Flexibility**: Supervisor handles complex multi-step tasks
+    - **Context**: Shared conversation history across specialists
     """
 
-    agent=create_agent(
-        model=settings.default_llm_model,
-        tools=basic_vision_tools,
-        system_prompt=system_prompt,
-    )  
+    print("Building multi-agent system...")
+    print("  - Creating Vision Specialist (image analysis)")
+    print("  - Creating OCR Specialist (text extraction)")
+    print("  - Creating QA Specialist (question answering)")
+    print("  - Creating Supervisor (orchestration)")
 
-    return agent
+    # Create the supervisor (which initializes all specialists)
+    supervisor = create_supervisor()
+
+    print("\n[OK] Multi-agent system ready!")
+    print("\nAvailable capabilities:")
+    print("  - Image analysis (properties, colors, quality)")
+    print("  - Text extraction (OCR, documents, receipts)")
+    print("  - Question answering (search, summarize)")
+    print("\nArchitecture: Tool-Calling Supervisor Pattern")
+    print("API: LangChain v1.0 create_agent (latest, non-deprecated)")
+
+    return supervisor
+
+
+# Backward compatibility: Keep the old function name but use new system
+def build_vision_agent():
+    """
+    Legacy function name for backward compatibility.
+
+    Now returns the full multi-agent supervisor instead of just vision agent.
+    The supervisor includes vision capabilities plus OCR and QA.
+
+    DEPRECATED: Use build_multiagent_system() instead.
+    """
+    print("[INFO] build_vision_agent() is legacy - now returns multi-agent supervisor")
+    return build_multiagent_system()
+
 
 if __name__ == "__main__":
-    print("[TEST] Testing LangChain v1.0 Vision Agent...\n")
+    print("="*70)
+    print("LANGGRAPH MULTI-AGENT SYSTEM TEST")
+    print("="*70)
+    print()
 
     # Check Python version
     import sys
@@ -90,49 +120,68 @@ if __name__ == "__main__":
         print(f"   Your version: {sys.version}")
         exit(1)
 
-    print("[OK] Python version OK\n")
+    print("[OK] Python version OK (3.10+)\n")
 
-    # Build the agent
-    print("Building vision agent using create_agent()...")
+    # Build the multi-agent system
+    print("Building multi-agent system using create_agent()...")
+    print()
 
     try:
-        agent = build_vision_agent()
-        print("[OK] Agent created successfully!\n")
+        agent = build_multiagent_system()
+        print("\n[OK] Multi-agent system created successfully!\n")
 
-        print("Agent type:", type(agent))
-        print("\nAgent info:")
-        print(f"  - Built on LangGraph: Yes")
-        print(f"  - Has memory: Yes")
-        print(f"  - Has persistence: Yes")
-        print(f"  - Supports streaming: Yes")
-        print(f"  - Tools available: {len(basic_vision_tools)}")
+        print("System Details:")
+        print(f"  - Architecture: Tool-Calling Supervisor Pattern")
+        print(f"  - Supervisor Model: {settings.default_llm_model}")
+        print(f"  - Specialist Agents: 3 (Vision, OCR, QA)")
+        print(f"  - Built on: LangGraph (via create_agent)")
+        print(f"  - Memory: Yes (conversation history)")
+        print(f"  - Streaming: Yes")
+        print(f"  - API: LangChain v1.0 (non-deprecated)")
 
         # Test with a simple message
-        print("\n\n[TEST] Testing agent with a message...")
+        print("\n\n[TEST] Testing multi-agent system...")
+        print("Query: 'Hello! What can you help me with?'")
+
         test_input = {
             "messages": [
-                {"role": "user", "content": "Hello! Can you help me analyze images?"}
+                {"role": "user", "content": "Hello! What can you help me with?"}
             ]
         }
 
         response = agent.invoke(test_input)
 
-        print("\n[OK] Agent response:")
-        print(f"  {response['messages'][-1].content[:200]}...")
+        print("\n[OK] Supervisor Response:")
+        print("-" * 70)
+        print(response['messages'][-1].content)
+        print("-" * 70)
 
-        print("\n\n[SUCCESS] LangChain v1.0 Agent is working perfectly!")
-        print("\nKey differences from old code:")
-        print("  [OLD] Manual LangGraph building")
-        print("  [NEW] Single create_agent() call")
-        print("  [OLD] llm.bind_tools()")
-        print("  [NEW] create_agent(model, tools, prompt)")
-        print("  [OLD] Manual state management")
-        print("  [NEW] Automatic with LangGraph")
+        print("\n\n[SUCCESS] Multi-Agent System is working perfectly!")
+        print("\nKey Differences from Old Patterns:")
+        print("  [OLD] create_react_agent from langgraph.prebuilt → DEPRECATED")
+        print("  [NEW] create_agent from langchain.agents → CURRENT")
+        print()
+        print("  [OLD] Single vision agent")
+        print("  [NEW] Multi-agent with Vision + OCR + QA specialists")
+        print()
+        print("  [OLD] No routing logic")
+        print("  [NEW] Intelligent supervisor with tool-calling delegation")
+        print()
+        print("  [OLD] Manual LangGraph construction")
+        print("  [NEW] Automatic via create_agent")
+        print()
+        print("\nArchitecture Pattern:")
+        print("  User → Supervisor → [Vision|OCR|QA] → Response")
+        print()
+        print("This follows LangChain 2025 best practices!")
 
     except Exception as e:
         print(f"\n[ERROR] {e}")
-        print("\nMake sure:")
-        print("1. OPENAI_API_KEY is set in .env")
-        print("2. You have internet connection")
-        print("3. langchain>=1.0.0 is installed")
-        print("4. Python 3.10+ is being used")
+        import traceback
+        traceback.print_exc()
+        print("\nTroubleshooting:")
+        print("1. Check OPENAI_API_KEY is set in .env")
+        print("2. Verify internet connection")
+        print("3. Ensure langchain>=1.0.0 is installed")
+        print("4. Confirm Python 3.10+ is being used")
+        print("5. Check all dependencies are installed (see requirements.txt)")
