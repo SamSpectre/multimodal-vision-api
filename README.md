@@ -19,17 +19,29 @@ Together they demonstrate how the new LangChain patterns simplify sequential rea
 
 ## Repository Layout
 ```
-config/                # Settings, env handling, path helpers
-graph.py               # Vision agent builder (create_agent wrapper)
-ocr_agent.py           # OCR-specific LangGraph agent & CLI demo
-chat.py                # Interactive CLI for the vision agent
-src/state/graph_state.py   # LangGraph TypedDict state (messages, etc.)
-src/tools/
-  ├─ basic_vision_tools.py   # Image properties, color, quality tools
-  ├─ ocr_tools.py            # EasyOCR/Tesseract utilities
-  └─ vision_utils.py         # Shared image helpers & multimodal message builder
-test_image.png & test_images/ # Sample assets for quick validation
-requirements.txt        # Python dependencies (LangChain 1.0+, vision libs)
+Project-4_Vision&Langchain/
+├─ config/
+│  └─ settings.py             # Env loading, defaults, project paths
+├─ graph.py                   # Builds supervisor + specialists (multi-agent system)
+├─ chat.py                    # CLI entry point (uses supervisor agent)
+├─ ocr_agent.py               # Legacy standalone OCR CLI (optional)
+├─ MULTI_AGENT_GUIDE.md       # Notes on LangGraph multi-agent patterns
+├─ src/
+│  ├─ agents/                 # create_agent-based specialists + supervisor
+│  │  ├─ supervisor.py        # Wraps specialists as tools for routing
+│  │  ├─ vision_agent.py      # Image properties/colors/quality specialist
+│  │  ├─ ocr_agent.py         # OCR/document specialist (EasyOCR/Tesseract)
+│  │  └─ qa_agent.py          # Context Q&A specialist (search & summarize tools)
+│  ├─ state/
+│  │  └─ graph_state.py       # TypedDict state definition for LangGraph
+│  └─ tools/
+│     ├─ vision_utils.py      # Shared image helpers + multimodal message builder
+│     ├─ basic_vision_tools.py# Image metadata/color/quality diagnostics
+│     └─ ocr_tools.py         # OCR/text-region/document-structure utilities
+├─ checkpoints/               # LangGraph memory snapshots (auto-created)
+├─ test_image.png, test_images/   # Sample assets for quick testing
+├─ requirements.txt
+└─ README.md
 ```
 
 ---

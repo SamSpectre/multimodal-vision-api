@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(source venv/bin/activate)",
+      "Bash(python config/settings.py:*)",
+      "Bash(venv/Scripts/python.exe config/settings.py)",
+      "Bash(venv/Scripts/python.exe:*)",
+      "Bash(ls:*)",
+      "Bash(git init:*)",
+      "WebSearch",
+      "WebFetch(domain:langchain-ai.github.io)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:python.langchain.com)",
+      "WebFetch(domain:blog.langchain.com)",
+      "Bash(venv/bin/python3:*)",
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(tree:*)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:mistral.ai)",
+      "WebFetch(domain:docs.mistral.ai)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
