@@ -1,34 +1,90 @@
-# Core LangChain/LangGraph packages (v1.0)
+# Core LangChain/LangGraph packages (v1.0+ / 2025 Latest)
 # IMPORTANT: v1.0 requires Python 3.10+
+#
+# 2025 Migration Notes:
+# - Use create_agent from langchain.agents (NOT create_react_agent from langgraph.prebuilt)
+# - Use system_prompt parameter (NOT deprecated state_modifier)
+# - langgraph-supervisor provides high-level multi-agent orchestration
+#
 langchain>=1.0.0
 langgraph>=1.0.0
 langchain-core>=1.0.0
 langchain-openai>=1.0.0
 langchain-anthropic>=1.0.0
+langchain-mistralai>=0.2.0  # For Mistral LLM in Document Agent
 
-# Vision and Image Processing
+# LangGraph Supervisor Package (2025 recommended for multi-agent systems)
+# Provides create_supervisor() for hierarchical multi-agent orchestration
+langgraph-supervisor>=0.0.1
+
+# ============================================
+# ENTERPRISE API LAYER
+# ============================================
+
+# FastAPI - Modern async web framework for building APIs
+# Why: High performance, automatic OpenAPI docs, type hints, async support
+fastapi>=0.109.0
+
+# Uvicorn - ASGI server to run FastAPI
+# Why: Production-grade, supports async, hot reload for development
+uvicorn[standard]>=0.27.0
+
+# Python-multipart - Required for file uploads in FastAPI
+python-multipart>=0.0.6
+
+# ============================================
+# DOCUMENT PROCESSING - MISTRAL OCR 3
+# ============================================
+
+# Mistral AI SDK - For OCR 3 document processing
+# Why: Best-in-class OCR, outperforms GPT-4o, Google Doc AI, Azure OCR
+# Pricing: $2/1000 pages ($1 with batch API)
+mistralai>=1.0.0
+
+# ============================================
+# ENTERPRISE LOGGING & MONITORING
+# ============================================
+
+# Structlog - Structured logging for production systems
+# Why: JSON logs, context binding, better debugging in production
+structlog>=24.1.0
+
+# ============================================
+# VISION & VIDEO PROCESSING (Phase 2)
+# ============================================
+
+# OpenCV - Video/image processing
+# Why: Industry standard for video processing, frame extraction
 opencv-python==4.10.0.84
+
+# Pillow - Image manipulation
+# Why: Image format conversion, resizing, preprocessing
 Pillow==10.4.0
+
+# NumPy - Numerical operations
+# Why: Required by OpenCV, image array operations
 numpy==1.26.4
 
-# OCR (Optical Character Recognition)
-easyocr==1.7.1
-pytesseract==0.3.13
+# MediaPipe - Face detection (Phase 2)
+# Why: Real-time face detection optimized for video
+# mediapipe==0.10.14  # Uncomment when starting Phase 2
 
-# Face Detection (will use later)
-# mediapipe==0.10.14  # Uncomment when needed
+# ============================================
+# ENVIRONMENT & CONFIGURATION
+# ============================================
 
-# Environment and Configuration
 python-dotenv==1.0.1
-
-# Utilities
 pydantic==2.9.2
 pydantic-settings==2.5.2
 
-# Optional: For better terminal output
+# ============================================
+# OPTIONAL: DEVELOPMENT & UTILITIES
+# ============================================
+
+# Terminal output
 rich==13.9.2
 colorama==0.4.6
 
-# Development tools (optional)
+# Development tools
 pytest==8.3.3
 black==24.10.0

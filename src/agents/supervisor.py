@@ -1,288 +1,305 @@
 """
-Supervisor Agent - Orchestrates specialist agents using tool-calling pattern.
+Supervisor Agent - Multi-Agent Orchestration
 
-Built using LangChain v1.0's create_agent() API with tool-calling pattern.
-This is the OFFICIAL RECOMMENDED APPROACH for multi-agent systems (2025).
+This implements the LangGraph Supervisor pattern for multi-agent systems.
+The supervisor analyzes incoming requests and routes them to specialist agents.
 
-Architecture: Supervisor/Router pattern
-- Centralized control flow
-- Specialist agents wrapped as tools
-- Context-aware delegation
-- Better than legacy create_react_agent or manual routing
+Architecture:
+    User Request
+         ↓
+    ┌─────────────┐
+    │ Supervisor  │ ← Mistral LLM decides routing
+    └─────────────┘
+         ↓
+    ┌────┴────┐
+    ↓         ↓
+┌─────────┐ ┌─────────┐
+│Document │ │ Video   │  ← Specialist Agents
+│ Agent   │ │ Agent   │
+└─────────┘ └─────────┘
+         ↓
+    Response
 
-The supervisor analyzes user requests and delegates to appropriate specialists:
-- Vision Agent: Image analysis, colors, quality
-- OCR Agent: Text extraction, document analysis
-- QA Agent: Question answering based on context
+LangGraph Pattern Used (2025 Latest):
+    - Using langgraph-supervisor package for hierarchical multi-agent systems
+    - create_supervisor() for high-level orchestration
+    - Fallback to manual StateGraph for fine-grained control
+    - Supervisor node makes routing decisions via tool calling (handoff pattern)
+    - Specialist agents process tasks
+    - Results flow back through supervisor
 """
 
-from langchain.agents import create_agent
-from langchain.tools import tool
-from config.settings import settings
-from .vision_agent import create_vision_agent
-from .ocr_agent import create_ocr_agent
-from .qa_agent import create_qa_agent
+import os
+from typing import Literal, List, Callable
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_mistralai import ChatMistralAI
+from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
+
+from .base import AgentState, AGENT_NAMES, AGENT_DESCRIPTIONS
+
+# Try to import langgraph-supervisor (latest 2025 pattern)
+try:
+    from langgraph_supervisor import create_supervisor
+    HAS_SUPERVISOR_PACKAGE = True
+except ImportError:
+    HAS_SUPERVISOR_PACKAGE = False
 
 
-# Initialize specialist agents (created once, reused)
-_vision_agent = None
-_ocr_agent = None
-_qa_agent = None
+def get_supervisor_llm():
+    """Get the LLM for the supervisor agent."""
+    api_key = os.getenv("MISTRAL_API_KEY")
+    if api_key and api_key != "your_mistral_api_key_here":
+        return ChatMistralAI(
+            model="mistral-large-latest",
+            temperature=0.1,
+            api_key=api_key,
+        )
+
+    # Fallback to OpenAI if Mistral not available
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key:
+        return ChatOpenAI(
+            model="gpt-4o",
+            temperature=0.1,
+            api_key=api_key,
+        )
+
+    raise ValueError("No LLM API key configured (MISTRAL_API_KEY or OPENAI_API_KEY)")
 
 
-def get_vision_agent():
-    """Get or create the Vision agent (singleton pattern)."""
-    global _vision_agent
-    if _vision_agent is None:
-        _vision_agent = create_vision_agent()
-    return _vision_agent
+SUPERVISOR_SYSTEM_PROMPT = """You are a Supervisor Agent that routes user requests to specialist agents.
+
+Your role is to:
+1. Analyze the user's request
+2. Determine which specialist agent should handle it
+3. Route to the appropriate agent
+
+Available Specialist Agents:
+
+{agent_descriptions}
+
+Routing Rules:
+- For document processing, OCR, PDF, text extraction → route to "document_agent"
+- For video analysis, face detection, emotion analysis → route to "video_agent"
+- If the task is complete or needs no specialist → respond with "FINISH"
+
+IMPORTANT: You must respond with ONLY the agent name to route to:
+- "document_agent" - for document/OCR tasks
+- "video_agent" - for video/face/emotion tasks
+- "FINISH" - if you can answer directly or task is complete
+
+Do not explain your routing decision. Just output the agent name.
+"""
 
 
-def get_ocr_agent():
-    """Get or create the OCR agent (singleton pattern)."""
-    global _ocr_agent
-    if _ocr_agent is None:
-        _ocr_agent = create_ocr_agent()
-    return _ocr_agent
-
-
-def get_qa_agent():
-    """Get or create the QA agent (singleton pattern)."""
-    global _qa_agent
-    if _qa_agent is None:
-        _qa_agent = create_qa_agent()
-    return _qa_agent
-
-
-# Wrap specialist agents as tools for the supervisor
-@tool
-def use_vision_specialist(query: str) -> str:
+def create_supervisor_node(llm):
     """
-    Use the Vision Analysis Specialist for image-related tasks.
+    Create the supervisor node function.
 
-    Use this specialist for:
-    - Analyzing image properties (size, format, dimensions)
-    - Color analysis and palette extraction
-    - Image quality assessment
-    - Detecting blur, contrast, or exposure issues
-    - Visual understanding tasks
-
-    Examples:
-    - "Analyze the colors in this image"
-    - "Check the quality of this photo"
-    - "What are the dimensions of this image?"
-    - "Is this image blurry?"
-
-    Args:
-        query: The user's vision-related request
-
-    Returns:
-        Vision analysis results
+    The supervisor analyzes messages and decides which agent to route to.
     """
-    vision_agent = get_vision_agent()
+    def supervisor_node(state: AgentState) -> AgentState:
+        """Supervisor decides which agent should handle the request."""
 
-    result = vision_agent.invoke({
-        "messages": [{"role": "user", "content": query}]
-    })
+        # Build the system prompt with agent descriptions
+        agent_desc_text = "\n\n".join([
+            f"**{name}**:\n{desc}"
+            for name, desc in AGENT_DESCRIPTIONS.items()
+        ])
 
-    return result["messages"][-1].content
+        system_prompt = SUPERVISOR_SYSTEM_PROMPT.format(
+            agent_descriptions=agent_desc_text
+        )
+
+        # Get the last user message
+        messages = state.get("messages", [])
+        if not messages:
+            return {
+                **state,
+                "next_agent": "FINISH",
+                "current_agent": "supervisor"
+            }
+
+        # Ask LLM to route
+        routing_messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=f"Route this request: {messages[-1].content}")
+        ]
+
+        response = llm.invoke(routing_messages)
+        routing_decision = response.content.strip().lower()
+
+        # Parse the routing decision
+        if "document" in routing_decision:
+            next_agent = "document_agent"
+            task_type = "document"
+        elif "video" in routing_decision:
+            next_agent = "video_agent"
+            task_type = "video"
+        elif "finish" in routing_decision:
+            next_agent = "FINISH"
+            task_type = "general"
+        else:
+            # Default to document agent for unclear requests
+            next_agent = "document_agent"
+            task_type = "unknown"
+
+        return {
+            **state,
+            "next_agent": next_agent,
+            "current_agent": "supervisor",
+            "task_type": task_type,
+        }
+
+    return supervisor_node
 
 
-@tool
-def use_ocr_specialist(query: str) -> str:
+def route_to_agent(state: AgentState) -> str:
     """
-    Use the OCR (Optical Character Recognition) Specialist for text extraction tasks.
+    Conditional routing function for the graph.
 
-    Use this specialist for:
-    - Extracting text from images
-    - Document digitization
-    - Receipt and invoice processing
-    - Form data extraction
-    - Text region detection and localization
-    - Document structure analysis
-
-    Examples:
-    - "Extract text from this document"
-    - "What text is in this image?"
-    - "Read the receipt"
-    - "Get the text regions from this form"
-    - "What type of document is this?"
-
-    Args:
-        query: The user's OCR-related request
-
-    Returns:
-        Extracted text or analysis results
+    Returns the name of the next node to execute.
     """
-    ocr_agent = get_ocr_agent()
+    next_agent = state.get("next_agent", "FINISH")
 
-    result = ocr_agent.invoke({
-        "messages": [{"role": "user", "content": query}]
-    })
-
-    return result["messages"][-1].content
-
-
-@tool
-def use_qa_specialist(query: str, context: str = "") -> str:
-    """
-    Use the Question Answering Specialist for context-based questions.
-
-    Use this specialist for:
-    - Answering questions about previously extracted text
-    - Finding specific information in OCR results
-    - Summarizing documents
-    - Searching for details in analyzed content
-
-    Examples:
-    - "What is the total amount on the receipt?"
-    - "Find the phone number in the extracted text"
-    - "Summarize this document"
-    - "What colors were detected?"
-
-    Args:
-        query: The user's question
-        context: Optional context from previous agent results
-
-    Returns:
-        Answer based on provided context
-    """
-    qa_agent = get_qa_agent()
-
-    # Build message with context if provided
-    if context:
-        message_content = f"Context:\n{context}\n\nQuestion: {query}"
+    if next_agent == "FINISH":
+        return END
+    elif next_agent == "document_agent":
+        return "document_agent"
+    elif next_agent == "video_agent":
+        return "video_agent"
     else:
-        message_content = query
-
-    result = qa_agent.invoke({
-        "messages": [{"role": "user", "content": message_content}]
-    })
-
-    return result["messages"][-1].content
+        return END
 
 
-def create_supervisor():
+def build_supervisor_with_package(
+    agents: List,
+    use_memory: bool = True,
+):
     """
-    Create the Supervisor agent that orchestrates specialist agents.
+    Build supervisor using langgraph-supervisor package (2025 recommended approach).
 
-    The supervisor uses the tool-calling pattern (recommended by LangChain 2025):
-    - Specialist agents (Vision, OCR, QA) are wrapped as tools
-    - Supervisor intelligently delegates to appropriate specialist
-    - Can call multiple specialists for complex tasks
-    - Maintains conversation context
+    This uses the high-level create_supervisor() API which:
+    - Automatically handles handoff between agents via tool calling
+    - Manages agent state and message flow
+    - Provides cleaner abstraction for multi-agent systems
 
-    This is the MODERN, RECOMMENDED approach for multi-agent systems,
-    replacing legacy patterns like create_react_agent or manual routing.
+    Args:
+        agents: List of agent graphs/runnables to coordinate
+        use_memory: Whether to enable conversation memory
 
     Returns:
-        Compiled supervisor agent ready for invocation
-
-    Usage:
-        >>> supervisor = create_supervisor()
-        >>> result = supervisor.invoke({
-        ...     "messages": [{"role": "user", "content": "Analyze this image and extract any text"}]
-        ... })
-        >>> print(result["messages"][-1].content)
+        Compiled supervisor workflow
     """
+    if not HAS_SUPERVISOR_PACKAGE:
+        raise ImportError(
+            "langgraph-supervisor package not installed. "
+            "Install with: pip install langgraph-supervisor"
+        )
 
-    # Define supervisor tools (specialist agents)
-    supervisor_tools = [
-        use_vision_specialist,
-        use_ocr_specialist,
-        use_qa_specialist
-    ]
+    llm = get_supervisor_llm()
+    checkpointer = MemorySaver() if use_memory else None
 
-    # System prompt for supervisor
-    system_prompt = """You are the Supervisor of a multimodal AI system with three specialist agents.
+    # Build agent descriptions for supervisor prompt
+    agent_desc = "\n".join([
+        f"- {name}: {desc.strip()}"
+        for name, desc in AGENT_DESCRIPTIONS.items()
+    ])
 
-Your role is to analyze user requests and delegate tasks to the appropriate specialist(s).
+    supervisor_prompt = f"""You are a supervisor coordinating specialist agents.
 
-Available specialists:
-1. **Vision Specialist** (use_vision_specialist)
-   - Image analysis, properties, dimensions
-   - Color analysis and palette extraction
-   - Image quality assessment (blur, contrast, exposure)
-   - Use for: "analyze image", "check quality", "what colors", "image properties"
+Available Agents:
+{agent_desc}
 
-2. **OCR Specialist** (use_ocr_specialist)
-   - Text extraction from images
-   - Document processing (receipts, forms, invoices)
-   - Text region detection and localization
-   - Document structure analysis
-   - Use for: "extract text", "read document", "OCR", "get text from image"
-
-3. **QA Specialist** (use_qa_specialist)
-   - Answer questions based on context
-   - Search extracted text
-   - Summarize documents
-   - Use for: "what is the total", "find phone number", "summarize", specific questions
-
-Delegation guidelines:
-- For image analysis → use_vision_specialist
-- For text extraction → use_ocr_specialist
-- For questions about extracted data → use_qa_specialist
-- For complex tasks, you can call MULTIPLE specialists in sequence
-  Example: "Extract text and tell me the total" → OCR specialist, then QA specialist
-
-Important:
-- Always delegate to specialists rather than answering directly
-- You can call multiple specialists for complex multi-step tasks
-- Pass user's full request to specialists
-- Synthesize specialist responses into coherent answer for user
-- Maintain conversation context across specialist calls
-
-Workflow examples:
-1. "Analyze this image" → use_vision_specialist
-2. "Extract text from receipt.jpg" → use_ocr_specialist
-3. "What's the total on this receipt?" → use_ocr_specialist (extract), then use_qa_specialist (find total)
-4. "Check image quality and extract any text" → use_vision_specialist, then use_ocr_specialist
+Route requests to the appropriate agent based on the task type.
+- Document/OCR/PDF tasks → document_agent
+- Video/face/emotion tasks → video_agent
 """
 
-    # Create supervisor using latest LangChain v1.0 API
-    supervisor = create_agent(
-        model=settings.default_llm_model,  # GPT-4o for intelligent routing
-        tools=supervisor_tools,
-        system_prompt=system_prompt,
-        checkpointer=None  # Add checkpointer here for conversation persistence
+    # Create supervisor using the package
+    workflow = create_supervisor(
+        agents=agents,
+        model=llm,
+        prompt=supervisor_prompt,
     )
 
-    return supervisor
+    return workflow.compile(checkpointer=checkpointer)
 
 
-# For standalone testing
-if __name__ == "__main__":
-    import sys
+def build_supervisor_graph(
+    document_agent_node,
+    video_agent_node=None,
+    use_memory: bool = True,
+):
+    """
+    Build the multi-agent supervisor graph.
 
-    print("Creating Multi-Agent Supervisor...")
-    supervisor = create_supervisor()
+    This creates a LangGraph StateGraph with:
+    - Supervisor node for routing decisions
+    - Document agent node for document processing
+    - Video agent node for video analysis (optional)
 
-    print("\n" + "="*70)
-    print("MULTI-AGENT SUPERVISOR - Multimodal Vision System")
-    print("="*70)
-    print("\nArchitecture: Tool-Calling Pattern (LangChain v1.0 Recommended)")
-    print("\nSpecialist Agents:")
-    print("  1. Vision Specialist - Image analysis, colors, quality")
-    print("  2. OCR Specialist - Text extraction, document processing")
-    print("  3. QA Specialist - Question answering, search, summarization")
-    print("\nModel: GPT-4o (multimodal)")
-    print("Pattern: Centralized supervisor with tool-calling delegation")
-    print("="*70 + "\n")
+    NOTE: This is the manual approach. For simpler setups, consider using
+    build_supervisor_with_package() with the langgraph-supervisor package.
 
-    # Interactive test
-    if len(sys.argv) > 1:
-        user_query = " ".join(sys.argv[1:])
-        print(f"User Query: {user_query}\n")
-        print("Processing...")
+    Args:
+        document_agent_node: Function that processes document tasks
+        video_agent_node: Function that processes video tasks (optional)
+        use_memory: Whether to enable conversation memory
 
-        result = supervisor.invoke({
-            "messages": [{"role": "user", "content": user_query}]
-        })
+    Returns:
+        Compiled LangGraph
+    """
+    # Get the supervisor LLM
+    llm = get_supervisor_llm()
 
-        print("\nSupervisor Response:")
-        print("="*70)
-        print(result["messages"][-1].content)
-        print("="*70)
+    # Create the supervisor node
+    supervisor = create_supervisor_node(llm)
+
+    # Build the graph
+    workflow = StateGraph(AgentState)
+
+    # Add nodes
+    workflow.add_node("supervisor", supervisor)
+    workflow.add_node("document_agent", document_agent_node)
+
+    if video_agent_node:
+        workflow.add_node("video_agent", video_agent_node)
+
+    # Set entry point
+    workflow.set_entry_point("supervisor")
+
+    # Add conditional routing from supervisor
+    if video_agent_node:
+        workflow.add_conditional_edges(
+            "supervisor",
+            route_to_agent,
+            {
+                "document_agent": "document_agent",
+                "video_agent": "video_agent",
+                END: END,
+            }
+        )
     else:
-        print("Usage: python supervisor.py <your query>")
-        print("Example: python supervisor.py 'Analyze image.jpg and extract any text'")
+        workflow.add_conditional_edges(
+            "supervisor",
+            route_to_agent,
+            {
+                "document_agent": "document_agent",
+                END: END,
+            }
+        )
+
+    # After specialist agents, route back to supervisor or end
+    workflow.add_edge("document_agent", END)
+
+    if video_agent_node:
+        workflow.add_edge("video_agent", END)
+
+    # Set up memory
+    checkpointer = MemorySaver() if use_memory else None
+
+    # Compile the graph
+    return workflow.compile(checkpointer=checkpointer)
