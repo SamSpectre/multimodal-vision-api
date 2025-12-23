@@ -1,400 +1,281 @@
-# Vision Platform Development Log
+# Vision Platform - Development Log
 
-> **Purpose**: This document provides context for Claude Code sessions. Start each new session by saying: "Read DEVELOPMENT_LOG.md and continue where we left off."
-
----
-
-## Project Overview
-
-**Project Name**: Enterprise Multimodal Vision Platform
-**Goal**: Build a production-ready, client-facing multimodal vision platform
-**Tech Stack**: FastAPI + LangChain + Mistral OCR 3 + MediaPipe + GPT-4o Vision
-
-**End Vision**: A platform clients can use via REST API to:
-- Process documents (OCR, classification, data extraction)
-- Analyze faces and emotions
-- Process video for object detection
+> **For Claude Code sessions**: Read CLAUDE_CONTEXT.md for quick context, this file for detailed history.
 
 ---
 
-## Current Status
+## Project Summary
 
-| Phase | Name | Status | Key Deliverables |
-|-------|------|--------|------------------|
-| 0-1 | Documents MVP | ✅ DONE | FastAPI + Mistral OCR 3 |
-| 1.5 | Codebase Cleanup | 🔜 NEXT | Remove clutter, trim unused code |
-| 2 | Video Analysis | ⏳ After cleanup | Video + Face/Emotion/Object Detection |
-| 3 | Async Processing | ⏳ Pending | Celery + Redis + Jobs |
-| 4 | Multi-Tenant | ⏳ Pending | Auth + Rate Limiting |
-| 5 | Client Deployment | ⏳ Future | Docker + CI/CD |
-
-### Key Decision: Video-First Approach
-Static image analysis was replaced with video processing. Video is the primary input for:
-- Face detection (MediaPipe)
-- Emotion analysis (GPT-4o Vision)
-- Object detection (GPT-4o Vision)
-- People counting
+**Project**: Enterprise Multimodal Vision Platform
+**Goal**: Production-ready SaaS API for document and video intelligence
+**Status**: MVP Complete with Authentication
 
 ---
 
-## Session 1 Summary (COMPLETED)
+## Session History
 
-### What Was Built
+### Session 3 (December 2024) - Model Optimization & Authentication
 
-Created a complete FastAPI-based document processing system with Mistral OCR 3.
+#### Objectives Completed
+1. **LangChain 2025 Migration**
+   - Updated from deprecated `create_react_agent` to `create_agent`
+   - Changed from `state_modifier` to `system_prompt` parameter
+   - Added support for `langgraph-supervisor` package
 
-### Files Created
+2. **Model Optimization for Cost & Latency**
+   - Supervisor: GPT-4o-mini ($0.15/1M) for cheap routing
+   - Document Agent: Mistral Large for OCR reasoning
+   - Video Agent: Groq Llama 3.2 Vision (~50ms latency)
+   - Per-agent configuration in `config/settings.py`
 
+3. **Groq Integration for Robotics**
+   - Created `src/clients/groq_client.py` singleton
+   - Added Groq API support with ~50ms latency
+   - Configured for real-time robotics applications
+
+4. **Authentication System**
+   - JWT tokens with configurable expiration
+   - API key authentication for services
+   - Protected all sensitive endpoints
+   - Admin-only endpoints (reset, API key generation)
+
+#### Files Created
 ```
-Project-4_Vision&Langchain/
-├── .env                              # API keys (OPENAI, MISTRAL)
-├── requirements.txt                  # Updated with fastapi, uvicorn, mistralai
-├── api/
-│   ├── __init__.py
-│   ├── main.py                       # FastAPI app with lifespan, CORS, middleware
-│   ├── routers/
-│   │   ├── __init__.py
-│   │   ├── health.py                 # Health check endpoints (/live, /ready)
-│   │   └── documents.py              # Document processing endpoints
-│   └── schemas/
-│       ├── __init__.py
-│       ├── base.py                   # Base Pydantic models
-│       └── documents.py              # Document request/response schemas
-├── config/
-│   └── settings.py                   # Pydantic Settings with .env loading
-└── src/
-    ├── clients/
-    │   ├── __init__.py
-    │   └── mistral_client.py         # Singleton Mistral client
-    └── tools/
-        └── mistral_ocr_tools.py      # OCR tools with @tool decorator
-```
-
-### API Endpoints Available
-
-```
-GET  /                           → API info
-GET  /docs                       → Swagger UI (auto-generated)
-GET  /api/v1/health/             → Health status
-GET  /api/v1/health/live         → Kubernetes liveness probe
-GET  /api/v1/health/ready        → Kubernetes readiness probe
-POST /api/v1/documents/ocr       → OCR text extraction
-POST /api/v1/documents/tables    → Table extraction
-POST /api/v1/documents/classify  → Document classification
-POST /api/v1/documents/analyze   → Full analysis pipeline
-POST /api/v1/documents/pdf       → Multi-page PDF processing
-POST /api/v1/documents/upload    → File upload endpoint
-GET  /api/v1/documents/status    → Service status
-```
-
-### Key Patterns Learned
-
-#### 1. Singleton Pattern
-**File**: `src/clients/mistral_client.py`
-```python
-_client = None
-def get_client():
-    global _client
-    if _client is None:
-        _client = ExpensiveResource()
-    return _client
-```
-**Why**: Expensive resources (API clients, DB connections, ML models) should only be instantiated once.
-
-#### 2. @tool Decorator (LangChain)
-**File**: `src/tools/mistral_ocr_tools.py`
-```python
-@tool
-def process_document(path: str) -> str:
-    """Docstring becomes the tool description for AI agents."""
-    return result
-```
-**Why**: Converts functions into agent-callable tools with automatic schema generation.
-
-#### 3. Pydantic Models
-**File**: `api/schemas/*.py`
-```python
-class Request(BaseModel):
-    field: str = Field(..., description="Required field")
-```
-**Why**: Type-safe validation, automatic API docs, error handling.
-
-#### 4. FastAPI Lifespan
-**File**: `api/main.py`
-```python
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup code
-    yield
-    # Shutdown code
-```
-**Why**: Modern way to handle app startup/shutdown (initialize resources, cleanup).
-
-#### 5. Health Checks
-**File**: `api/routers/health.py`
-- `/live` - Is the process running? (Kubernetes restarts if fails)
-- `/ready` - Can it handle requests? (Load balancer removes if fails)
-
-#### 6. Pydantic Settings
-**File**: `config/settings.py`
-```python
-class Settings(BaseSettings):
-    OPENAI_API_KEY: str = Field(...)
-    model_config = SettingsConfigDict(env_file=".env")
-```
-**Why**: 12-factor app pattern - configuration from environment.
-
-### Issues Resolved
-
-1. **ModuleNotFoundError for langchain_core**
-   - Fix: `pip install langchain-core langchain langchain-openai`
-
-2. **API keys showing as NOT SET**
-   - Cause: `load_dotenv()` without explicit path
-   - Fix: Added explicit path in settings.py:
-     ```python
-     PROJECT_ROOT = Path(__file__).parent.parent
-     ENV_FILE = PROJECT_ROOT / ".env"
-     load_dotenv(dotenv_path=ENV_FILE)
-     ```
-
----
-
-## Phase 1.5: Codebase Cleanup (NEXT)
-
-Before implementing the Video Analysis Module, clean up the existing codebase.
-
-### Cleanup Tasks
-1. Audit `src/` directory for unused legacy code
-2. Remove legacy CLIs: `chat.py`, `ocr_agent.py` (root level)
-3. Review `src/agents/` - remove if not integrated with API
-4. Consolidate overlapping tool files in `src/tools/`
-5. Clean up `requirements.txt` - remove unused deps
-6. Update documentation files
-
-### Files to Review for Removal
-```
-chat.py                    # Legacy CLI
-ocr_agent.py               # Legacy CLI (root level)
-graph.py                   # Review if still used
-MULTI_AGENT_GUIDE.md       # May be outdated
-src/agents/                # Review if integrated with API
-```
-
----
-
-## Phase 2: Video Analysis Module (AFTER CLEANUP)
-
-### Overview
-A unified video processing module where users upload videos and select what to analyze:
-- **Face Detection** - Find faces throughout video (MediaPipe)
-- **Emotion Analysis** - Analyze emotions on detected faces (GPT-4o)
-- **Object Detection** - Identify objects in frames (GPT-4o)
-- **People Counting** - Count and track people
-
-### Learning Objectives
-- **OpenCV** - Video loading, frame extraction, image manipulation
-- **MediaPipe** - Real-time face detection optimized for video
-- **Frame Sampling** - Smart frame selection (not every frame)
-- **GPT-4o Vision** - Scene understanding, object detection, emotion analysis
-- **Temporal Data** - Timestamped results, tracking across frames
-
-### Files to Create
-
-```
-src/processors/
+src/auth/
 ├── __init__.py
-├── video_processor.py           # OpenCV video handling
-└── video_analysis_pipeline.py   # Main orchestrator
+├── models.py         # User, Token, TokenData
+├── utils.py          # JWT, password hashing
+├── dependencies.py   # FastAPI auth deps
+└── router.py         # /auth endpoints
 
-src/models/
+src/clients/
+└── groq_client.py    # Groq singleton
+```
+
+#### Files Modified
+```
+config/settings.py           # Per-agent model config, auth settings
+requirements.txt             # Groq, auth dependencies
+api/main.py                  # Auth router, startup messages
+api/routers/agent.py         # Protected endpoints
+api/routers/documents.py     # Protected endpoints
+.env                         # Auth credentials
+```
+
+#### Issues Resolved
+1. **bcrypt 5.x incompatible with passlib**
+   - Solution: Pin bcrypt>=4.0.0,<5.0.0
+
+2. **LangChain deprecation warnings**
+   - Solution: Use `create_agent` from `langchain.agents`
+
+3. **Windows encoding errors**
+   - Solution: `sys.stdout.reconfigure(encoding='utf-8')`
+
+---
+
+### Session 2 (Previous) - Multi-Agent System
+
+#### Objectives Completed
+1. Created LangGraph multi-agent architecture
+2. Implemented supervisor routing pattern
+3. Created Document Agent with Mistral integration
+4. Created Video Agent placeholder (Phase 2)
+5. Added streaming SSE support
+
+#### Files Created
+```
+src/agents/
 ├── __init__.py
-├── face_detector.py             # MediaPipe face detection
-└── vision_analyzer.py           # GPT-4o emotion/object analysis
-
-src/tools/
-└── video_tools.py               # LangChain @tool functions
-
-api/routers/
-└── video.py                     # Video API endpoints
-
-api/schemas/
-└── video.py                     # Pydantic models
-```
-
-### Implementation Steps
-
-1. **Install Dependencies**
-   ```bash
-   pip install opencv-python mediapipe
-   ```
-
-2. **Create Video Processor** (`src/processors/video_processor.py`)
-   - OpenCV video handling, frame extraction, sampling
-
-3. **Create Face Detector** (`src/models/face_detector.py`)
-   - MediaPipe wrapper for video frames
-
-4. **Create Vision Analyzer** (`src/models/vision_analyzer.py`)
-   - GPT-4o wrapper for emotion and object detection
-
-5. **Create Video Pipeline** (`src/processors/video_analysis_pipeline.py`)
-   - Orchestrates face detection, emotion, objects, people counting
-
-6. **Create Video Tools** (`src/tools/video_tools.py`)
-   - LangChain @tool functions
-
-7. **Create Video Schemas** (`api/schemas/video.py`)
-   - Pydantic models for requests/responses
-
-8. **Create Video Router** (`api/routers/video.py`)
-   - API endpoints
-
-9. **Update Main App** (`api/main.py`)
-   - Include video router
-
-### API Endpoints to Add
-
-```
-POST /api/v1/video/analyze  → Analyze video (faces, emotions, objects, people)
-POST /api/v1/video/upload   → Upload video file
-GET  /api/v1/video/info     → Get video metadata
-POST /api/v1/video/frames   → Extract specific frames
-GET  /api/v1/video/status   → Service status
+├── base.py           # AgentState, constants
+├── orchestrator.py   # Main entry point
+├── supervisor.py     # Routing logic
+├── document_agent.py # Mistral + OCR
+└── video_agent.py    # Placeholder
 ```
 
 ---
 
-## Future Phases (Brief)
+### Session 1 - Document Processing MVP
 
-### Phase 3: Async Processing
-- Celery for background jobs (video processing takes time)
-- Redis as message broker
-- Job status tracking
+#### Objectives Completed
+1. FastAPI application structure
+2. Mistral OCR 3 integration
+3. Health check endpoints
+4. Document processing endpoints
+5. Pydantic schemas
 
-### Phase 4: Async Processing
-- Celery for background jobs
-- Redis as message broker
-- Job status tracking
-- Files: `workers/celery_app.py`, `workers/tasks/`
+#### Files Created
+```
+api/
+├── main.py
+├── routers/
+│   ├── health.py
+│   └── documents.py
+└── schemas/
+    ├── base.py
+    └── documents.py
 
-### Phase 5: Multi-Tenant & Production
-- API key authentication
-- Rate limiting middleware
-- Per-tenant configuration
-- Prometheus metrics
+src/
+├── clients/
+│   └── mistral_client.py
+└── tools/
+    └── mistral_ocr_tools.py
 
-### Phase 6: Client Deployment
-- Docker containerization
-- Docker Compose for full stack
-- CI/CD with GitHub Actions
-- Cloud deployment (AWS/GCP/Azure)
+config/
+└── settings.py
+```
 
 ---
 
-## Quick Start Commands
+## Architecture Evolution
 
-### Start Development Server
+### Phase 1: Document Processing
+```
+FastAPI → Mistral OCR 3 → Response
+```
+
+### Phase 2: Multi-Agent System
+```
+FastAPI → Supervisor → Document Agent → Mistral OCR 3
+                     → Video Agent (placeholder)
+```
+
+### Phase 3: Production-Ready (Current)
+```
+FastAPI → JWT/API Key Auth → Supervisor (gpt-4o-mini)
+                           → Document Agent (mistral-large)
+                           → Video Agent (Groq ~50ms)
+```
+
+---
+
+## Key Technical Decisions
+
+### 1. Model Selection Strategy
+| Agent | Decision | Rationale |
+|-------|----------|-----------|
+| Supervisor | GPT-4o-mini | Cheap ($0.15/1M), fast, good at routing |
+| Document | Mistral Large | Best synergy with Mistral OCR 3 |
+| Video | Groq | ~50ms latency for real-time robotics |
+
+### 2. Authentication Approach
+- **JWT for users**: Stateless, scalable, industry standard
+- **API Keys for services**: Simple for automation/scripts
+- **Both supported**: Flexible for different use cases
+
+### 3. LangChain 2025 Patterns
+- `create_agent` instead of deprecated `create_react_agent`
+- `system_prompt` instead of deprecated `state_modifier`
+- `langgraph-supervisor` for high-level orchestration
+
+---
+
+## Lessons Learned
+
+### Technical
+1. **Dependency Versions Matter**: bcrypt 5.x broke passlib integration
+2. **LangChain Moves Fast**: Check for deprecations before implementing
+3. **Latency is Critical for Robotics**: Groq's ~50ms vs OpenAI's ~200ms
+4. **Windows Has Quirks**: Encoding issues require explicit handling
+
+### Architecture
+1. **Cost Optimization**: Use cheap models for routing, expensive for reasoning
+2. **Separation of Concerns**: Supervisor routes, specialists execute
+3. **Singleton Pattern**: Crucial for expensive API clients
+4. **Auth Flexibility**: Support multiple auth methods
+
+---
+
+## Testing
+
+### Test Files Created
+```
+test_authentication.py        # Auth system tests
+test_document_intelligence.py # Document processing tests
+test_mistral_ocr.py          # OCR tool tests
+```
+
+### Run All Tests
+```bash
+python test_authentication.py
+python test_document_intelligence.py
+python test_mistral_ocr.py
+```
+
+---
+
+## Next Steps
+
+### Phase 5: Video/Robotics Agent
+1. Implement `src/tools/video_tools.py`
+2. Add OpenCV frame extraction
+3. Integrate MediaPipe face detection
+4. Complete `video_agent_node` with Groq
+5. Add `/api/v1/video/*` endpoints
+
+### Phase 6: Async Processing
+1. Set up Celery with Redis
+2. Create background task workers
+3. Add job status tracking
+4. Implement webhooks for completion
+
+### Phase 7: Deployment
+1. Dockerfile and docker-compose
+2. CI/CD with GitHub Actions
+3. Cloud deployment (AWS/GCP/Azure)
+4. Monitoring with Prometheus/Grafana
+
+### Enterprise Features
+1. Rate limiting per API key
+2. Usage tracking and billing
+3. Multi-tenant support
+4. Audit logging
+5. HTTPS/TLS configuration
+
+---
+
+## Configuration Reference
+
+### Environment Variables
+```bash
+# API Keys
+OPENAI_API_KEY=sk-proj-...
+MISTRAL_API_KEY=...
+GROQ_API_KEY=gsk_...
+
+# Model Selection
+supervisor_model=gpt-4o-mini
+document_agent_model=mistral-large-latest
+video_agent_model=llama-3.2-11b-vision-preview
+
+# Authentication
+SECRET_KEY=your_secret_key
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+API_KEY=vp_your_api_key
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=$2b$12$...
+AUTH_ENABLED=True
+```
+
+### Quick Start
 ```bash
 cd "C:\Users\samde\Langchain_Projects\Project-4_Vision&Langchain"
-
-# Windows
 .\.venv\Scripts\activate
-
-# Linux/WSL
-source venv/bin/activate
-
-# Run server
+pip install -r requirements.txt
 uvicorn api.main:app --reload --port 8000
 ```
 
-### Verify Setup
-1. http://localhost:8000/docs - Swagger UI
-2. http://localhost:8000/api/v1/health/ready - Check services
-3. http://localhost:8000/api/v1/documents/status - Check Mistral
-
-### Test Configuration
-```bash
-python config/settings.py
-```
-
 ---
 
-## Environment Variables (.env)
+## User Preferences (For Future Sessions)
 
-```
-OPENAI_API_KEY=sk-proj-...
-MISTRAL_API_KEY=...
-```
-
----
-
-## Dependencies (requirements.txt)
-
-Key packages added:
-- `fastapi>=0.109.0` - Web framework
-- `uvicorn[standard]>=0.27.0` - ASGI server
-- `mistralai>=1.0.0` - Mistral OCR 3
-- `python-multipart>=0.0.6` - File uploads
-- `structlog>=24.1.0` - Structured logging
-
-To add for Phase 2:
-- `mediapipe>=0.10.14` - Face detection
-- `opencv-python>=4.9.0` - Image processing
-
----
-
-## Project Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      FastAPI Application                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   /health   │  │  /documents │  │   /faces    │  (Next) │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│ Mistral OCR 3 │    │   MediaPipe   │    │  GPT-4o Vision │
-│   (Documents) │    │    (Faces)    │    │   (Analysis)   │
-└───────────────┘    └───────────────┘    └───────────────┘
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
-                              ▼
-                    ┌───────────────┐
-                    │  LangChain    │
-                    │    Tools      │
-                    └───────────────┘
-```
-
----
-
-## How to Continue Next Session
-
-**Say to Claude Code:**
-> "Read DEVELOPMENT_LOG.md and continue where we left off. We're starting Phase 2: Face/Emotion Module."
-
-**What Claude should do:**
-1. Read this file for context
-2. Install MediaPipe
-3. Create face detector model wrapper
-4. Create emotion classifier
-5. Create face tools
-6. Create face schemas
-7. Create face API endpoints
-8. Update main app
-
----
-
-## User Preferences
-
-- **Learning Focus**: Understand each concept deeply, not just copy-paste
+- **Learning Focus**: Understand concepts, not just copy-paste
 - **Approach**: Iterative, step-by-step development
-- **Documentation**: Explain patterns as we implement them
-- **Goal**: Build foundation for future complex enterprise projects
+- **Documentation**: Explain patterns as we implement
+- **Goal**: Build foundation for enterprise deployment
+- **Direction**: Robotics-focused with low-latency vision
 
 ---
 
-*Last Updated: Session 1 completion - Documents MVP done, Face/Emotion module next*
+*Last Updated: December 2024 - Session 3 Complete*
