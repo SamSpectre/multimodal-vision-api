@@ -94,3 +94,19 @@ colorama==0.4.6
 # Development tools
 pytest==8.3.3
 black==24.10.0
+
+# ============================================
+# SECURITY & AUTHENTICATION
+# ============================================
+
+# python-jose - JWT (JSON Web Tokens) implementation
+# Why: Industry standard for stateless authentication
+# JWT = encoded token containing user info, signed with secret key
+python-jose[cryptography]>=3.3.0
+
+# passlib + bcrypt - Password hashing
+# Why: Secure password storage, bcrypt is the gold standard
+# NEVER store passwords in plain text!
+# Note: bcrypt 5.x has compatibility issues with passlib
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<5.0.0

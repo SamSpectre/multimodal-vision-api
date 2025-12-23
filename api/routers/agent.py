@@ -19,7 +19,7 @@ import uuid
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from langchain_core.messages import HumanMessage, AIMessage
@@ -31,6 +31,8 @@ from src.agents import (
 )
 from src.clients.mistral_client import is_mistral_available
 from src.clients.groq_client import is_groq_available
+from src.auth.dependencies import require_auth, require_admin
+from src.auth.models import User
 from config.settings import settings
 
 
@@ -66,9 +68,14 @@ class AgentStatusResponse(BaseModel):
 # === ENDPOINTS ===
 
 @router.post("/chat", response_model=AgentChatResponse)
-async def chat_with_agent(request: AgentChatRequest):
+async def chat_with_agent(
+    request: AgentChatRequest,
+    current_user: User = Depends(require_auth)
+):
     """
     Chat with the Multi-Agent System.
+
+    **Requires Authentication:** JWT token or API key
 
     The supervisor analyzes your request and routes it to the appropriate
     specialist agent:
@@ -144,9 +151,14 @@ async def chat_with_agent(request: AgentChatRequest):
 
 
 @router.post("/stream")
-async def stream_agent_response(request: AgentChatRequest):
+async def stream_agent_response(
+    request: AgentChatRequest,
+    current_user: User = Depends(require_auth)
+):
     """
     Stream responses from the Multi-Agent System.
+
+    **Requires Authentication:** JWT token or API key
 
     Uses Server-Sent Events (SSE) to stream the agent's response
     in real-time. Useful for long-running document processing.
@@ -267,9 +279,13 @@ async def get_agent_status():
 
 
 @router.post("/reset")
-async def reset_agent_memory():
+async def reset_agent_memory(
+    current_user: User = Depends(require_admin)
+):
     """
     Reset the Multi-Agent System.
+
+    **Requires Authentication:** Admin privileges
 
     Clears all conversation memory and resets the agent state.
     Use this to start fresh.
@@ -278,7 +294,8 @@ async def reset_agent_memory():
         reset_multi_agent_system()
         return {
             "success": True,
-            "message": "Multi-agent system has been reset"
+            "message": "Multi-agent system has been reset",
+            "reset_by": current_user.username
         }
     except Exception as e:
         raise HTTPException(

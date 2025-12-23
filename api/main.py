@@ -53,6 +53,10 @@ from config.settings import settings
 # Import routers
 from api.routers import health, documents, agent
 
+# Import auth router
+from src.auth.router import router as auth_router
+from src.auth.dependencies import require_auth, get_current_user
+
 
 # === LIFESPAN EVENTS ===
 # These run when the app starts up and shuts down
@@ -92,6 +96,19 @@ async def lifespan(app: FastAPI):
     for name, info in services.items():
         status = "OK" if info.get('available') else "--"
         print(f"  [{status}] {name}")
+
+    # Show authentication status
+    print("-" * 60)
+    print("SECURITY:")
+    auth_status = "ENABLED" if settings.AUTH_ENABLED else "DISABLED (dev mode)"
+    print(f"  Authentication: {auth_status}")
+    print(f"  JWT Expiry: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
+    print(f"  API Key: {'Configured' if settings.API_KEY else 'Not set'}")
+    print(f"  Admin User: {settings.ADMIN_USERNAME}")
+
+    if settings.SECRET_KEY == "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND_HEX_32":
+        print("  ⚠️  WARNING: Using default SECRET_KEY! Generate a secure one:")
+        print("     openssl rand -hex 32")
 
     print("=" * 60)
     print("API is ready! Visit http://localhost:8000/docs for Swagger UI")
@@ -258,25 +275,34 @@ async def general_exception_handler(request: Request, exc: Exception):
 # === INCLUDE ROUTERS ===
 # Routers group related endpoints together
 
-# Health check endpoints
+# Authentication endpoints (public)
+app.include_router(
+    auth_router,
+    prefix="/api/v1/auth",
+    tags=["Authentication"]
+)
+
+# Health check endpoints (public)
 app.include_router(
     health.router,
     prefix="/api/v1/health",
     tags=["Health"]  # Groups in Swagger UI
 )
 
-# Document processing endpoints
+# Document processing endpoints (protected)
 app.include_router(
     documents.router,
     prefix="/api/v1/documents",
-    tags=["Documents"]
+    tags=["Documents"],
+    dependencies=[],  # Auth is handled per-endpoint in router
 )
 
-# Document Intelligence Agent endpoints
+# Document Intelligence Agent endpoints (protected)
 app.include_router(
     agent.router,
     prefix="/api/v1/agent",
-    tags=["Agent"]
+    tags=["Agent"],
+    dependencies=[],  # Auth is handled per-endpoint in router
 )
 
 

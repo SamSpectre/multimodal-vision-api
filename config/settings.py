@@ -156,6 +156,63 @@ class Settings(BaseSettings):
     checkpoint_dir: Path = project_root / "checkpoints"
 
     # ============================================
+    # AUTHENTICATION & SECURITY
+    # ============================================
+
+    # JWT Settings
+    # SECRET_KEY: Used to sign JWT tokens - MUST be kept secret!
+    # Generate a secure key with: openssl rand -hex 32
+    SECRET_KEY: str = Field(
+        default="CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND_HEX_32",
+        description="Secret key for JWT signing - generate with: openssl rand -hex 32"
+    )
+
+    # JWT Algorithm: HS256 is the standard for symmetric keys
+    JWT_ALGORITHM: str = "HS256"
+
+    # Token expiration time in minutes (default: 30 minutes)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # API Key for simple authentication (alternative to JWT)
+    # Can be used for service-to-service communication
+    API_KEY: Optional[str] = Field(
+        default=None,
+        description="Static API key for simple authentication"
+    )
+
+    # Admin credentials (stored in .env)
+    # These are the default admin user credentials
+    ADMIN_USERNAME: str = Field(
+        default="admin",
+        description="Admin username for authentication"
+    )
+
+    ADMIN_PASSWORD_HASH: Optional[str] = Field(
+        default=None,
+        description="Bcrypt hash of admin password - generate with auth utils"
+    )
+
+    # Authentication settings
+    AUTH_ENABLED: bool = Field(
+        default=True,
+        description="Enable/disable authentication (disable for development only)"
+    )
+
+    # Public endpoints that don't require authentication
+    # These paths are accessible without a token
+    PUBLIC_PATHS: list[str] = [
+        "/",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/api/v1/openapi.json",
+        "/api/v1/health",
+        "/api/v1/health/ready",
+        "/api/v1/auth/login",
+        "/api/v1/auth/token",
+    ]
+
+    # ============================================
     # DEPLOYMENT SETTINGS
     # ============================================
 

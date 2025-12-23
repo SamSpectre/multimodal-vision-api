@@ -45,8 +45,12 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
+
+# Import authentication
+from src.auth.dependencies import require_auth
+from src.auth.models import User
 
 # Import our schemas
 from api.schemas.documents import (
@@ -141,10 +145,13 @@ def detect_file_type(base64_string: str) -> str:
 @router.post("/ocr", response_model=None)
 async def ocr_endpoint(
     request: DocumentRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth)
 ):
     """
     Extract text from a document using Mistral OCR 3.
+
+    **Requires Authentication:** JWT token or API key
 
     This endpoint:
     1. Accepts a document (base64, URL, or path)
@@ -245,10 +252,13 @@ async def ocr_endpoint(
 @router.post("/tables")
 async def extract_tables_endpoint(
     request: DocumentRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth)
 ):
     """
     Extract tables from a document.
+
+    **Requires Authentication:** JWT token or API key
 
     Returns tables in HTML format with:
     - Row and column structure
@@ -327,10 +337,13 @@ async def extract_tables_endpoint(
 @router.post("/classify")
 async def classify_document_endpoint(
     request: DocumentRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth)
 ):
     """
     Classify a document's type.
+
+    **Requires Authentication:** JWT token or API key
 
     Uses OCR + heuristic analysis to determine document type:
     - invoice
@@ -410,10 +423,13 @@ async def classify_document_endpoint(
 @router.post("/analyze")
 async def analyze_document_endpoint(
     request: DocumentRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth)
 ):
     """
     Complete document analysis pipeline.
+
+    **Requires Authentication:** JWT token or API key
 
     Performs:
     1. OCR text extraction (Mistral OCR 3)
@@ -505,10 +521,13 @@ async def analyze_document_endpoint(
 @router.post("/pdf")
 async def process_pdf_endpoint(
     request: DocumentRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth)
 ):
     """
     Process a multi-page PDF document.
+
+    **Requires Authentication:** JWT token or API key
 
     Returns page-by-page OCR results.
 
@@ -602,10 +621,13 @@ async def get_service_status():
 async def upload_and_process(
     file: UploadFile = File(..., description="Document file to process"),
     extract_tables: bool = Form(True),
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks = None,
+    current_user: User = Depends(require_auth)
 ):
     """
     Upload and process a document file.
+
+    **Requires Authentication:** JWT token or API key
 
     Alternative to base64 encoding - just upload the file directly.
 

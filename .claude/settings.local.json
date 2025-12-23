@@ -38,7 +38,11 @@
       "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" -c \"\nimport sys\nsys.stdout.reconfigure(encoding=''utf-8'')\nimport os\n\n# Check the GROQ key loading\nfrom dotenv import load_dotenv\nload_dotenv()\nkey = os.getenv(''GROQ_API_KEY'', ''NOT SET'')\nprint(f''GROQ_API_KEY loaded: {key[:15]}...'' if key and key != ''NOT SET'' else ''GROQ_API_KEY: NOT SET'')\n\n# Check if groq package is installed\ntry:\n    from groq import Groq\n    print(''groq package: Installed'')\nexcept ImportError:\n    print(''groq package: NOT INSTALLED'')\n\n# Check langchain-groq\ntry:\n    from langchain_groq import ChatGroq\n    print(''langchain-groq package: Installed'')\nexcept ImportError:\n    print(''langchain-groq package: NOT INSTALLED'')\n\")",
       "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/pip.exe\" install groq langchain-groq)",
       "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" test_mistral_ocr.py)",
-      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" test_document_intelligence.py)"
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" test_document_intelligence.py)",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/pip.exe\" install \"python-jose[cryptography]\" \"passlib[bcrypt]\" bcrypt)",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" test_authentication.py)",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/pip.exe\" install \"bcrypt<5.0.0\" --force-reinstall)",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" -c \"from src.auth.utils import get_password_hash; print(get_password_hash(''admin123''))\")"
     ],
     "deny": [],
     "ask": []
