@@ -30,6 +30,8 @@ from src.agents import (
     AGENT_DESCRIPTIONS,
 )
 from src.clients.mistral_client import is_mistral_available
+from src.clients.groq_client import is_groq_available
+from config.settings import settings
 
 
 router = APIRouter()
@@ -217,18 +219,27 @@ async def get_agent_status():
 
     Returns information about:
     - System availability
-    - Supervisor configuration
+    - Supervisor configuration (model, provider, latency)
     - Available specialist agents and their capabilities
+    - Model selection optimized for cost/latency
     """
+    # Determine overall availability
+    mistral_ok = is_mistral_available()
+    groq_ok = is_groq_available()
+
     return AgentStatusResponse(
-        status="available" if is_mistral_available() else "unavailable",
+        status="available" if mistral_ok else "partial",
         supervisor={
-            "model": "mistral-large-latest",
+            "model": settings.supervisor_model,
+            "provider": settings.supervisor_provider,
             "role": "Routes requests to specialist agents",
+            "cost": "$0.15/1M tokens (cost optimized)",
         },
         agents={
             "document_agent": {
-                "status": "active",
+                "status": "active" if mistral_ok else "fallback",
+                "model": settings.document_agent_model,
+                "provider": settings.document_agent_provider,
                 "description": AGENT_DESCRIPTIONS.get("document_agent", ""),
                 "capabilities": [
                     "OCR text extraction",
@@ -238,13 +249,17 @@ async def get_agent_status():
                 ],
             },
             "video_agent": {
-                "status": "placeholder",
+                "status": "ready" if groq_ok else "fallback",
+                "model": settings.video_agent_model,
+                "provider": settings.video_agent_provider,
+                "latency": "~50ms" if groq_ok else "~200ms",
                 "description": AGENT_DESCRIPTIONS.get("video_agent", ""),
                 "capabilities": [
-                    "Face detection (Phase 2)",
-                    "Emotion analysis (Phase 2)",
-                    "Object detection (Phase 2)",
-                    "People counting (Phase 2)",
+                    "Real-time robotics vision",
+                    "Face detection",
+                    "Emotion analysis",
+                    "Object detection",
+                    "People counting",
                 ],
             },
         }

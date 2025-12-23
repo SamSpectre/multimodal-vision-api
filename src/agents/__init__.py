@@ -36,6 +36,7 @@ from .document_agent import (
 
 from .video_agent import (
     video_agent_node,
+    get_video_llm,  # New: returns the video/robotics LLM (Groq)
 )
 
 from .supervisor import (
@@ -60,9 +61,10 @@ __all__ = [
     "document_agent_node",
     "video_agent_node",
 
-    # Standalone agents
+    # Standalone agents and LLM getters
     "create_standalone_document_agent",
     "get_document_agent",
+    "get_video_llm",  # Groq low-latency vision
 
     # Supervisor building
     "build_supervisor_graph",

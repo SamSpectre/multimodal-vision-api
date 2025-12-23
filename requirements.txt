@@ -17,6 +17,12 @@ langchain-mistralai>=0.2.0  # For Mistral LLM in Document Agent
 # Provides create_supervisor() for hierarchical multi-agent orchestration
 langgraph-supervisor>=0.0.1
 
+# Groq - Low-latency LLM inference for real-time robotics vision
+# Why: 2.6x faster than OpenAI, ~50ms latency for Llama 3.2 Vision
+# Use for: Video/robotics agent with real-time vision requirements
+groq>=0.4.0
+langchain-groq>=0.1.0
+
 # ============================================
 # ENTERPRISE API LAYER
 # ============================================

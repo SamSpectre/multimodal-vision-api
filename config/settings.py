@@ -67,6 +67,12 @@ class Settings(BaseSettings):
         description="Mistral AI API key for OCR 3"
     )
 
+    # Groq - Low-latency inference for real-time robotics vision
+    GROQ_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Groq API key for low-latency vision (Llama 3.2 Vision)"
+    )
+
     # ============================================
     # MODEL CONFIGURATION
     # ============================================
@@ -79,6 +85,29 @@ class Settings(BaseSettings):
     # Mistral OCR 3 Settings
     mistral_ocr_model: str = "mistral-ocr-2512"  # Latest OCR 3 model
     mistral_ocr_batch_enabled: bool = True  # Use batch API for 50% discount
+
+    # ============================================
+    # PER-AGENT MODEL CONFIGURATION
+    # Optimized for cost, performance, and latency
+    # ============================================
+
+    # Supervisor Agent - Cheap, fast routing decisions
+    # Uses GPT-4o-mini for cost efficiency (~$0.15/1M tokens)
+    supervisor_model: str = "gpt-4o-mini"
+    supervisor_provider: str = "openai"  # openai, mistral
+    supervisor_temperature: float = 0.1
+
+    # Document Agent - Mistral for document intelligence
+    # Best synergy with Mistral OCR 3 tools
+    document_agent_model: str = "mistral-large-latest"
+    document_agent_provider: str = "mistral"  # mistral, openai
+    document_agent_temperature: float = 0.1
+
+    # Video/Robotics Agent - Low-latency vision for real-time
+    # Groq's Llama 3.2 Vision: ~50ms latency, 2.6x faster than OpenAI
+    video_agent_model: str = "llama-3.2-11b-vision-preview"
+    video_agent_provider: str = "groq"  # groq, openai
+    video_agent_temperature: float = 0.3
 
     # ============================================
     # FASTAPI / API SETTINGS
@@ -154,7 +183,8 @@ class Settings(BaseSettings):
         return {
             "openai": bool(self.OPENAI_API_KEY),
             "anthropic": bool(self.ANTHROPIC_API_KEY),
-            "mistral": bool(self.MISTRAL_API_KEY) and self.MISTRAL_API_KEY != "your_mistral_api_key_here"
+            "mistral": bool(self.MISTRAL_API_KEY) and self.MISTRAL_API_KEY != "your_mistral_api_key_here",
+            "groq": bool(self.GROQ_API_KEY) and self.GROQ_API_KEY != "your_groq_api_key_here"
         }
 
     def get_available_models(self) -> list[str]:
@@ -165,7 +195,9 @@ class Settings(BaseSettings):
         if self.ANTHROPIC_API_KEY:
             models.extend(["claude-sonnet-4-20250514", "claude-sonnet-3-5-20241022"])
         if self.MISTRAL_API_KEY and self.MISTRAL_API_KEY != "your_mistral_api_key_here":
-            models.extend(["mistral-ocr-2512"])  # Mistral OCR 3
+            models.extend(["mistral-large-latest", "mistral-ocr-2512"])
+        if self.GROQ_API_KEY and self.GROQ_API_KEY != "your_groq_api_key_here":
+            models.extend(["llama-3.2-11b-vision-preview", "llama-3.2-90b-vision-preview"])
         return models
 
     def get_available_services(self) -> dict[str, dict]:
@@ -180,6 +212,12 @@ class Settings(BaseSettings):
                 "available": bool(self.MISTRAL_API_KEY) and self.MISTRAL_API_KEY != "your_mistral_api_key_here",
                 "model": "mistral-ocr-2512",
                 "provider": "Mistral AI"
+            },
+            "robotics_vision": {
+                "available": bool(self.GROQ_API_KEY) and self.GROQ_API_KEY != "your_groq_api_key_here",
+                "model": "llama-3.2-11b-vision-preview",
+                "provider": "Groq",
+                "latency": "~50ms"
             },
             "text_generation": {
                 "available": bool(self.OPENAI_API_KEY) or bool(self.ANTHROPIC_API_KEY),

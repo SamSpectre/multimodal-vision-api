@@ -8,7 +8,7 @@ Architecture:
     User Request
          ↓
     ┌─────────────┐
-    │ Supervisor  │ ← Mistral LLM decides routing
+    │ Supervisor  │ ← GPT-4o-mini (cheap, fast routing)
     └─────────────┘
          ↓
     ┌────┴────┐
@@ -27,6 +27,10 @@ LangGraph Pattern Used (2025 Latest):
     - Supervisor node makes routing decisions via tool calling (handoff pattern)
     - Specialist agents process tasks
     - Results flow back through supervisor
+
+Model Selection (Cost Optimized):
+    - Supervisor: GPT-4o-mini ($0.15/1M) - cheap, fast routing
+    - Configurable via config/settings.py
 """
 
 import os
@@ -38,6 +42,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from .base import AgentState, AGENT_NAMES, AGENT_DESCRIPTIONS
+from config.settings import settings
 
 # Try to import langgraph-supervisor (latest 2025 pattern)
 try:
@@ -48,25 +53,61 @@ except ImportError:
 
 
 def get_supervisor_llm():
-    """Get the LLM for the supervisor agent."""
+    """
+    Get the LLM for the supervisor agent.
+
+    Uses GPT-4o-mini by default for cost efficiency (~$0.15/1M tokens).
+    Model is configurable via config/settings.py:
+      - supervisor_model: "gpt-4o-mini" (default)
+      - supervisor_provider: "openai" (default)
+      - supervisor_temperature: 0.1
+    """
+    provider = settings.supervisor_provider
+    model = settings.supervisor_model
+    temperature = settings.supervisor_temperature
+
+    # Primary: Use configured provider
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            print(f"[Supervisor] Using {model} (OpenAI) - cost optimized")
+            return ChatOpenAI(
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+            )
+
+    elif provider == "mistral":
+        api_key = os.getenv("MISTRAL_API_KEY")
+        if api_key and api_key != "your_mistral_api_key_here":
+            print(f"[Supervisor] Using {model} (Mistral)")
+            return ChatMistralAI(
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+            )
+
+    # Fallback: Try OpenAI if configured provider not available
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key:
+        print("[Supervisor] Fallback to gpt-4o-mini (OpenAI)")
+        return ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.1,
+            api_key=api_key,
+        )
+
+    # Fallback: Try Mistral
     api_key = os.getenv("MISTRAL_API_KEY")
     if api_key and api_key != "your_mistral_api_key_here":
+        print("[Supervisor] Fallback to mistral-large-latest")
         return ChatMistralAI(
             model="mistral-large-latest",
             temperature=0.1,
             api_key=api_key,
         )
 
-    # Fallback to OpenAI if Mistral not available
-    api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
-        return ChatOpenAI(
-            model="gpt-4o",
-            temperature=0.1,
-            api_key=api_key,
-        )
-
-    raise ValueError("No LLM API key configured (MISTRAL_API_KEY or OPENAI_API_KEY)")
+    raise ValueError("No LLM API key configured (OPENAI_API_KEY or MISTRAL_API_KEY)")
 
 
 SUPERVISOR_SYSTEM_PROMPT = """You are a Supervisor Agent that routes user requests to specialist agents.

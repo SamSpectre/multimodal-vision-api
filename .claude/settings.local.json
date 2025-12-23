@@ -33,7 +33,12 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:pypi.org)",
       "WebFetch(domain:reference.langchain.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" -c \"\nimport sys\nsys.stdout.reconfigure(encoding=''utf-8'')\n\nprint(''='' * 60)\nprint(''VERIFYING MODEL OPTIMIZATION IMPLEMENTATION'')\nprint(''='' * 60)\n\n# Test settings\nfrom config.settings import settings\nprint(''\\n[Config Settings]'')\nprint(f''  Supervisor: {settings.supervisor_model} ({settings.supervisor_provider})'')\nprint(f''  Document:   {settings.document_agent_model} ({settings.document_agent_provider})'')\nprint(f''  Video:      {settings.video_agent_model} ({settings.video_agent_provider})'')\n\n# Test clients\nprint(''\\n[API Clients]'')\nfrom src.clients.mistral_client import is_mistral_available\nfrom src.clients.groq_client import is_groq_available\nprint(f''  Mistral OCR: {\"\"Ready\"\" if is_mistral_available() else \"\"Not configured\"\"}'')\nprint(f''  Groq Vision: {\"\"Ready (~50ms latency)\"\" if is_groq_available() else \"\"Not configured\"\"}'')\n\n# Test imports\nprint(''\\n[Agent Imports]'')\nfrom src.agents import get_multi_agent_system, AGENT_DESCRIPTIONS\nprint(f''  Multi-agent system: OK'')\nprint(f''  Available agents: {list(AGENT_DESCRIPTIONS.keys())}'')\n\nprint(''\\n'' + ''='' * 60)\nprint(''ALL IMPLEMENTATIONS COMPLETE'')\nprint(''='' * 60)\n\")",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" -c \"\nimport sys\nsys.stdout.reconfigure(encoding=''utf-8'')\nimport os\n\n# Check the GROQ key loading\nfrom dotenv import load_dotenv\nload_dotenv()\nkey = os.getenv(''GROQ_API_KEY'', ''NOT SET'')\nprint(f''GROQ_API_KEY loaded: {key[:15]}...'' if key and key != ''NOT SET'' else ''GROQ_API_KEY: NOT SET'')\n\n# Check if groq package is installed\ntry:\n    from groq import Groq\n    print(''groq package: Installed'')\nexcept ImportError:\n    print(''groq package: NOT INSTALLED'')\n\n# Check langchain-groq\ntry:\n    from langchain_groq import ChatGroq\n    print(''langchain-groq package: Installed'')\nexcept ImportError:\n    print(''langchain-groq package: NOT INSTALLED'')\n\")",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/pip.exe\" install groq langchain-groq)",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" test_mistral_ocr.py)",
+      "Bash(\"/mnt/c/Users/samde/Langchain_Projects/Project-4_Vision&Langchain/.venv/Scripts/python.exe\" test_document_intelligence.py)"
     ],
     "deny": [],
     "ask": []

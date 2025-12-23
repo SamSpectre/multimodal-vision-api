@@ -126,16 +126,18 @@ def reset_multi_agent_system():
 def invoke_agent(
     message: str,
     thread_id: str = "default",
-) -> dict:
+    return_full_state: bool = False,
+) -> str:
     """
     Convenience function to invoke the multi-agent system.
 
     Args:
         message: User message
         thread_id: Conversation thread ID for memory
+        return_full_state: If True, return full state dict; if False, return response string
 
     Returns:
-        Agent response dict with messages and state
+        Agent response string (or full state dict if return_full_state=True)
     """
     agent = get_multi_agent_system()
 
@@ -154,7 +156,18 @@ def invoke_agent(
         config={"configurable": {"thread_id": thread_id}}
     )
 
-    return result
+    if return_full_state:
+        return result
+
+    # Extract response string from the result
+    messages = result.get("messages", [])
+    if messages:
+        last_message = messages[-1]
+        if hasattr(last_message, 'content'):
+            return last_message.content
+        return str(last_message)
+
+    return "No response from agent"
 
 
 # For testing

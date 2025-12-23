@@ -39,6 +39,7 @@ from langchain.agents import create_agent
 
 from .base import AgentState
 from src.tools.mistral_ocr_tools import MISTRAL_OCR_TOOLS
+from config.settings import settings
 
 
 DOCUMENT_AGENT_PROMPT = """You are a Document Intelligence Specialist powered by Mistral OCR 3.
@@ -68,25 +69,61 @@ If no file path is provided, ask the user to provide one.
 
 
 def get_document_llm():
-    """Get the LLM for the document agent."""
+    """
+    Get the LLM for the document agent.
+
+    Uses Mistral Large by default for best synergy with Mistral OCR 3.
+    Model is configurable via config/settings.py:
+      - document_agent_model: "mistral-large-latest" (default)
+      - document_agent_provider: "mistral" (default)
+      - document_agent_temperature: 0.1
+    """
+    provider = settings.document_agent_provider
+    model = settings.document_agent_model
+    temperature = settings.document_agent_temperature
+
+    # Primary: Use configured provider
+    if provider == "mistral":
+        api_key = os.getenv("MISTRAL_API_KEY")
+        if api_key and api_key != "your_mistral_api_key_here":
+            print(f"[DocumentAgent] Using {model} (Mistral) - OCR synergy")
+            return ChatMistralAI(
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+            )
+
+    elif provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            print(f"[DocumentAgent] Using {model} (OpenAI)")
+            return ChatOpenAI(
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+            )
+
+    # Fallback: Try Mistral first (preferred for documents)
     api_key = os.getenv("MISTRAL_API_KEY")
     if api_key and api_key != "your_mistral_api_key_here":
+        print("[DocumentAgent] Fallback to mistral-large-latest")
         return ChatMistralAI(
             model="mistral-large-latest",
             temperature=0.1,
             api_key=api_key,
         )
 
-    # Fallback to OpenAI
+    # Fallback: Try OpenAI
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
+        print("[DocumentAgent] Fallback to gpt-4o (OpenAI)")
         return ChatOpenAI(
             model="gpt-4o",
             temperature=0.1,
             api_key=api_key,
         )
 
-    raise ValueError("No LLM API key configured")
+    raise ValueError("No LLM API key configured (MISTRAL_API_KEY or OPENAI_API_KEY)")
 
 
 # Singleton for the internal document agent
