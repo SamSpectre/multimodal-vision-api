@@ -30,11 +30,12 @@ Example:
 - health: Health check endpoints (/api/v1/health/*)
 - documents: Document processing (/api/v1/documents/*)
 - agent: Document Intelligence Agent (/api/v1/agent/*)
-- video: Video processing (/api/v1/video/*) - coming soon
+- video: Video/Image Analysis (/api/v1/video/*) - Groq Vision ~50ms
 """
 
 from api.routers import health
 from api.routers import documents
 from api.routers import agent
+from api.routers import video
 
-__all__ = ["health", "documents", "agent"]
+__all__ = ["health", "documents", "agent", "video"]

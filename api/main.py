@@ -51,7 +51,7 @@ from fastapi.responses import JSONResponse
 from config.settings import settings
 
 # Import routers
-from api.routers import health, documents, agent
+from api.routers import health, documents, agent, video
 
 # Import auth router
 from src.auth.router import router as auth_router
@@ -133,17 +133,19 @@ app = FastAPI(
     ## Features
 
     * **Document Processing** - OCR, classification, data extraction using Mistral OCR 3
-    * **Face Analysis** - Detection, emotions, attributes (coming soon)
-    * **Video Processing** - Object detection, scene analysis (coming soon)
+    * **Video/Image Analysis** - Scene understanding, object detection via Groq Vision (~50ms)
+    * **Multi-Agent System** - Intelligent routing to specialist agents
 
     ## Authentication
 
-    API key required in header: `X-API-Key: your_api_key`
+    JWT token or API key required:
+    - `Authorization: Bearer <token>` (JWT)
+    - `X-API-Key: <key>` (API key)
 
-    ## Rate Limits
+    ## Latency
 
-    - Standard: 60 requests/minute
-    - Enterprise: Custom limits
+    - Document OCR: ~1s (Mistral OCR 3)
+    - Video Analysis: ~50ms (Groq Vision - robotics optimized)
     """,
     version="1.0.0",
 
@@ -302,6 +304,14 @@ app.include_router(
     agent.router,
     prefix="/api/v1/agent",
     tags=["Agent"],
+    dependencies=[],  # Auth is handled per-endpoint in router
+)
+
+# Video/Image Analysis endpoints (protected)
+app.include_router(
+    video.router,
+    prefix="/api/v1/video",
+    tags=["Video Analysis"],
     dependencies=[],  # Auth is handled per-endpoint in router
 )
 

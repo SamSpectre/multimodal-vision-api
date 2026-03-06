@@ -130,17 +130,22 @@ def is_groq_available() -> bool:
 
 
 # === Available Vision Models on Groq ===
+# Updated January 2025: Llama 4 models with native multimodal support
 
 GROQ_VISION_MODELS = {
-    "llama-3.2-11b-vision-preview": {
-        "description": "Llama 3.2 11B Vision - Fast, good accuracy",
-        "latency": "~50ms",
-        "recommended_for": "real-time robotics, video analysis"
+    "meta-llama/llama-4-scout-17b-16e-instruct": {
+        "description": "Llama 4 Scout - Fast multimodal, 17B active (109B total)",
+        "speed": "~460 tok/s",
+        "recommended_for": "real-time robotics, fast image analysis",
+        "context": "128K tokens",
+        "max_images": 5
     },
-    "llama-3.2-90b-vision-preview": {
-        "description": "Llama 3.2 90B Vision - Higher accuracy, slower",
-        "latency": "~150ms",
-        "recommended_for": "complex scene understanding"
+    "meta-llama/llama-4-maverick-17b-128e-instruct": {
+        "description": "Llama 4 Maverick - Powerful multimodal, 17B active (400B total)",
+        "speed": "~200 tok/s",
+        "recommended_for": "precise image understanding, complex analysis",
+        "context": "128K tokens",
+        "max_images": 5
     }
 }
 
@@ -150,14 +155,14 @@ def get_recommended_vision_model(use_case: str = "robotics") -> str:
     Get the recommended Groq vision model for a use case.
 
     Args:
-        use_case: "robotics" (fast) or "accuracy" (slower but better)
+        use_case: "robotics" (fast) or "accuracy" (more capable)
 
     Returns:
         Model name string
     """
     if use_case == "accuracy":
-        return "llama-3.2-90b-vision-preview"
-    return "llama-3.2-11b-vision-preview"  # Default: fast for robotics
+        return "meta-llama/llama-4-maverick-17b-128e-instruct"
+    return "meta-llama/llama-4-scout-17b-16e-instruct"  # Default: fast for robotics
 
 
 # === Quick Test ===
